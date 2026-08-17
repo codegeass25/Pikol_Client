@@ -431,6 +431,17 @@
     });
   };
 
+  /* Convert API-relative asset URLs into absolute API URLs. This is required
+     when this frontend is hosted separately (for example GitHub Pages) from
+     the Node/Express API server. */
+  function assetUrl(url) {
+    url = String(url == null ? '' : url).trim();
+    if (!url) return '';
+    if (/^(?:https?:|data:|blob:|\/\/)/i.test(url)) return url;
+    if (url.charAt(0) === '/') return API.replace(/\/+$/, '') + url;
+    return API.replace(/\/+$/, '') + '/' + url.replace(/^\/+/, '');
+  }
+
   /* ---------- toasts ---------- */
   var ICONS = { success: '✓', error: '✕', warning: '⚠', info: 'ℹ' };
   function toast(msg, type) {
@@ -540,12 +551,12 @@
     var bootLogo = b.boot_logo_url || b.logo_url || '';
     [['#hero-logo', b.logo_url || appLogo], ['#app-logo', appLogo]].forEach(function (pair) {
       var el = $(pair[0]); if (!el) return;
-      el.innerHTML = pair[1] ? '<img src="' + esc(pair[1]) + '" alt="' + esc(name) + ' logo" />' : esc(initials);
+      el.innerHTML = pair[1] ? '<img src="' + esc(assetUrl(pair[1])) + '" alt="' + esc(name) + ' logo" />' : esc(initials);
     });
     var bl = $('#boot-logo');
-    if (bl) bl.innerHTML = bootLogo ? '<img src="' + esc(bootLogo) + '" alt="' + esc(name) + ' logo" />' : esc(initials);
+    if (bl) bl.innerHTML = bootLogo ? '<img src="' + esc(assetUrl(bootLogo)) + '" alt="' + esc(name) + ' logo" />' : esc(initials);
     var bn = $('#boot-name'); if (bn) bn.textContent = name;
-    if (b.favicon_url) $('#favicon').href = b.favicon_url;
+    if (b.favicon_url) $('#favicon').href = assetUrl(b.favicon_url);
     $('#hero-name').textContent = name;
     $('#app-name').textContent = name;
     $('#hero-short').textContent = b.short_name || 'Court booking';
@@ -1669,7 +1680,7 @@
           ? '<div class="card stack" style="gap:8px;margin:0">' +
             (info.account_name ? '<div class="s"><strong>Account name:</strong> ' + esc(info.account_name) + '</div>' : '') +
             (info.account_number ? '<div class="s"><strong>Number:</strong> ' + esc(info.account_number) + '</div>' : '') +
-            (info.qr_url ? '<img class="qr-preview" src="' + esc(info.qr_url) + '" alt="' + esc(info.label) + ' QR code" />' : '') +
+            (info.qr_url ? '<img class="qr-preview" src="' + esc(assetUrl(info.qr_url)) + '" alt="' + esc(info.label) + ' QR code" />' : '') +
             (info.instructions ? '<div class="s muted">' + esc(info.instructions) + '</div>' : '') +
             '</div>'
           : '<div class="card stack" style="gap:8px;margin:0"><strong>ONLINE PAYMENT</strong><div class="s muted">' + esc(info.instructions || 'Pay securely online with PayMongo. Payment is automatically verified by the backend webhook.') + '</div></div>';
@@ -2055,7 +2066,7 @@
       var t = d.tournament, divisions = d.divisions || [];
       var html = '<div><button class="btn btn-ghost btn-sm" id="tn-back">← All tournaments</button></div>' +
         '<div class="card stack" style="gap:8px">' +
-        (t.poster_url ? '<img src="' + esc(t.poster_url) + '" alt="' + esc(t.name) + ' poster" style="width:100%;border-radius:12px;object-fit:cover;max-height:240px" />' : '') +
+        (t.poster_url ? '<img src="' + esc(assetUrl(t.poster_url)) + '" alt="' + esc(t.name) + ' poster" style="width:100%;border-radius:12px;object-fit:cover;max-height:240px" />' : '') +
         '<div class="spread"><h1 class="page-title">' + esc(t.name) + '</h1>' + tnBadgeFor(t) + '</div>' +
         '<div class="s muted">' + esc(tnWhen(t)) + (t.venue ? ' · ' + esc(t.venue) : '') + '</div>' +
         (t.description ? '<p class="s">' + esc(t.description) + '</p>' : '') +
