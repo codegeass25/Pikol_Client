@@ -1975,6 +1975,14 @@
       'data-pay-name="' + esc(name) + '" data-pay-sub="' + esc(subtitle || '') + '">' + label + '</button>';
   }
 
+  function eventCancelAction(eventType, r) {
+    var active = eventType === 'tournament'
+      ? ['pending', 'approved'].indexOf(String(r.status)) >= 0
+      : ['pending_payment', 'payment_submitted', 'confirmed'].indexOf(String(r.status)) >= 0;
+    if (!active) return '';
+    return '<button class="btn btn-ghost btn-sm" data-event-cancel="' + eventType + ':' + r.id + '">Cancel</button>';
+  }
+
   function loadMyRegistrations() {
     if (!TOKEN) return Promise.resolve();
     var p1 = api('/api/my/tournament-registrations').then(function (rows) {
@@ -1995,6 +2003,7 @@
           '<span class="badge badge-' + (r.status === 'approved' ? 'confirmed' : r.status === 'disapproved' ? 'rejected' : 'pending') + '">' +
           esc(r.status === 'pending' ? 'Pending approval' : r.status) + '</span>' +
           payActions('tournament', r, r.tournament_name, sub) +
+          eventCancelAction('tournament', r) +
           '</span></div>';
       }).join('') : '<div class="empty"><strong>No tournament registrations</strong>Register from the Tournaments tab.</div>';
       return rows;
@@ -2015,6 +2024,7 @@
           '<span class="badge badge-' + (r.status === 'confirmed' ? 'confirmed' : r.status === 'rejected' ? 'rejected' : 'pending') + '">' +
           esc(OPREG_LABEL_C[r.status] || r.status) + '</span>' +
           payActions('open_play', r, r.title, whenText(r.event_date, r.start_time, r.end_time)) +
+          eventCancelAction('open_play', r) +
           '</span></div>';
       }).join('') : '<div class="empty"><strong>No Open Play registrations</strong>Join a session from the Open Play tab.</div>';
       return rows;
@@ -2027,6 +2037,32 @@
       pill.textContent = action; pill.classList.toggle('hidden', !action);
     }).catch(function (e) { toast(e.message, 'error'); });
   }
+
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest('[data-event-cancel]');
+    if (!b) return;
+    if (!TOKEN) return toast('Sign in to cancel.', 'error');
+    var parts = b.dataset.eventCancel.split(':');
+    var eventType = parts[0];
+    var registrationId = Number(parts[1]);
+    var label = eventType === 'tournament' ? 'tournament registration' : 'Open Play registration';
+    return modal({
+      title: 'Cancel ' + label + '?',
+      confirmText: 'Yes, cancel',
+      cancelText: 'Keep',
+      danger: true,
+      body: '<p>Are you sure you want to cancel this registration?</p><p class="muted">Any payment receipt will remain in the system history, but the cancelled registration will no longer appear in the Admin Transaction Center.</p>',
+      onConfirm: function () {
+        var url = eventType === 'tournament'
+          ? '/api/tournament-registrations/' + registrationId + '/cancel'
+          : '/api/open-play-registrations/' + registrationId + '/cancel';
+        return api(url, { method: 'POST' }).then(function () {
+          toast('Registration cancelled.', 'success');
+          return loadMyRegistrations();
+        });
+      }
+    });
+  });
 
   document.addEventListener('click', function (ev) {
     var b = ev.target.closest('[data-pay-now]');
