@@ -101,6 +101,45 @@ body {
   background: var(--brand-background);
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
+  position: relative;
+  isolation: isolate;
+}
+
+/* ---------- Brand watermark ---------------------------------------
+   Uses the existing AZUL COURTSIDE brand asset as a very subtle,
+   fixed watermark across the complete client/admin UI. The layer is
+   non-interactive and intentionally sits above page surfaces so the
+   branding remains visible even inside cards, panels and sections.
+-------------------------------------------------------------------- */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9998;
+  pointer-events: none;
+  background-image: url("branding/app_logo-1786955097906-db986592811d.svg");
+  background-repeat: no-repeat;
+  background-position: center center;
+  background-size: min(430px, 58vw);
+  opacity: 0.035;
+  filter: grayscale(1) contrast(0.9);
+  mix-blend-mode: multiply;
+}
+
+[data-theme="dark"] body::before {
+  opacity: 0.055;
+  mix-blend-mode: screen;
+}
+
+@media (max-width: 700px) {
+  body::before {
+    background-size: min(300px, 68vw);
+    opacity: 0.03;
+  }
+
+  [data-theme="dark"] body::before {
+    opacity: 0.045;
+  }
 }
 img { max-width: 100%; display: block; }
 button, input, select, textarea { font: inherit; color: inherit; }
@@ -763,6 +802,55 @@ button.stat-card { width: 100%; text-align: left; cursor: pointer; display: flex
 .insights-block > summary::before { content: "▸"; transition: transform .15s ease; }
 .insights-block[open] > summary::before { transform: rotate(90deg); }
 
+/* ---------- Transactions + Communications: LIST presentation -------- */
+#page-payments .table-wrap > table.data:not(.as-cards),
+#page-notifications .table-wrap > table.data:not(.as-cards) {
+  width: 100%;
+  border-collapse: collapse;
+  display: table;
+}
+#page-payments .table-wrap > table.data:not(.as-cards) thead,
+#page-notifications .table-wrap > table.data:not(.as-cards) thead {
+  display: table-header-group;
+}
+#page-payments .table-wrap > table.data:not(.as-cards) tbody,
+#page-notifications .table-wrap > table.data:not(.as-cards) tbody {
+  display: table-row-group;
+}
+#page-payments .table-wrap > table.data:not(.as-cards) tr,
+#page-notifications .table-wrap > table.data:not(.as-cards) tr {
+  display: table-row;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+  transform: none;
+}
+#page-payments .table-wrap > table.data:not(.as-cards) th,
+#page-payments .table-wrap > table.data:not(.as-cards) td,
+#page-notifications .table-wrap > table.data:not(.as-cards) th,
+#page-notifications .table-wrap > table.data:not(.as-cards) td {
+  display: table-cell;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  padding: 12px 10px;
+  vertical-align: middle;
+}
+#page-payments .table-wrap > table.data:not(.as-cards) tbody tr:hover,
+#page-notifications .table-wrap > table.data:not(.as-cards) tbody tr:hover {
+  background: var(--surface-2);
+}
+@media (max-width: 800px) {
+  #page-payments .table-wrap,
+  #page-notifications .table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  #page-payments .table-wrap > table.data:not(.as-cards),
+  #page-notifications .table-wrap > table.data:not(.as-cards) {
+    min-width: 760px;
+  }
+}
+
 /* ---------- TABLES RENDERED AS CARDS -------------------------------
    Applied by cards.js: every list row becomes a self-contained card
    with labelled fields and an action footer. Desktop = many per row,
@@ -1178,4 +1266,70 @@ table.data.as-cards > tbody > tr.is-fullwidth > td { display: block; border: 0; 
   .settings-nav { flex-direction: column; }
   .list-row { gap: 10px; }
   .list-side { justify-content: flex-start; }
+}
+
+
+/* ---------------------------------------------------------------------------
+   HARD OVERRIDE: Transactions + Communications are ALWAYS LIST/TABLE views.
+   This intentionally wins over the global .data.as-cards rules, even if a
+   stale class is present during a dynamic refresh or an older cached script.
+--------------------------------------------------------------------------- */
+#page-payments table.data,
+#page-notifications table.data {
+  display: table !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  border-collapse: collapse !important;
+  border-spacing: 0 !important;
+}
+#page-payments table.data > thead,
+#page-notifications table.data > thead { display: table-header-group !important; }
+#page-payments table.data > tbody,
+#page-notifications table.data > tbody { display: table-row-group !important; }
+#page-payments table.data > tbody > tr,
+#page-notifications table.data > tbody > tr {
+  display: table-row !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+#page-payments table.data > tbody > tr > td,
+#page-notifications table.data > tbody > tr > td,
+#page-payments table.data > thead > tr > th,
+#page-notifications table.data > thead > tr > th {
+  display: table-cell !important;
+  border: 0 !important;
+  border-bottom: 1px solid var(--border) !important;
+  border-radius: 0 !important;
+  padding: 12px 10px !important;
+  vertical-align: middle !important;
+  text-align: inherit !important;
+}
+#page-payments table.data > tbody > tr > td::before,
+#page-notifications table.data > tbody > tr > td::before { content: none !important; display: none !important; }
+#page-payments table.data > tbody > tr > td:first-child,
+#page-notifications table.data > tbody > tr > td:first-child {
+  display: table-cell !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  padding-bottom: 12px !important;
+  margin-bottom: 0 !important;
+  border-bottom: 1px solid var(--border) !important;
+}
+#page-payments table.data > tbody > tr > td.cell-actions,
+#page-notifications table.data > tbody > tr > td.cell-actions {
+  display: table-cell !important;
+  margin-top: 0 !important;
+  padding-top: 12px !important;
+  border-top: 0 !important;
+}
+#page-payments table.data > tbody > tr:hover,
+#page-notifications table.data > tbody > tr:hover {
+  background: var(--surface-2) !important;
+  box-shadow: none !important;
+  transform: none !important;
 }
