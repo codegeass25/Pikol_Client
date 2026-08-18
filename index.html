@@ -49,7 +49,6 @@
       <div class="spread" style="margin-bottom:16px">
         <h2 class="section-title">Welcome</h2>
         <div class="row" style="gap:6px">
-          <button class="btn btn-ghost btn-icon" id="auth-api" title="Set API server" aria-label="Set API server">⚙</button>
           <button class="btn btn-ghost btn-icon theme-toggle" title="Toggle theme" aria-label="Toggle theme">◐</button>
         </div>
       </div>
@@ -521,7 +520,7 @@
         }
         return data;
       });
-    }, function () { throw new Error('Cannot reach the booking server. Check the API address.'); });
+    }, function () { throw new Error('Cannot reach the booking server. Please try again later.'); });
   }
 
   /* ---------- theme ---------- */
@@ -593,25 +592,6 @@
     if (!v) return 'Free';
     return (BRAND.currency || '') + ' ' + Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   }
-
-  /* ---------- API url dialog ---------- */
-  function apiDialog() {
-    modal({
-      title: 'Booking server address',
-      body: '<p class="muted tiny">Enter the public API address served by the facility Cloudflare Tunnel, e.g. <code>https://api.mdmsportal.uk</code>.</p>' +
-        '<div class="field mt-4"><label class="label" for="api-url">API URL</label>' +
-        '<input class="input" id="api-url" value="' + esc(API) + '" placeholder="https://api.mdmsportal.uk" /></div>',
-      confirmText: 'Save & reload',
-      onConfirm: function (host) {
-        var v = $('#api-url', host).value.trim().replace(/\/+$/, '');
-        if (!/^https?:\/\//.test(v)) throw new Error('Enter a full URL starting with http:// or https://');
-        localStorage.setItem('pb_api_url', v);
-        location.reload();
-        return true;
-      }
-    });
-  }
-  $('#auth-api').onclick = apiDialog;
 
   /* ---------- auth tabs ---------- */
   $$('[data-authtab]').forEach(function (tab) {
@@ -2488,8 +2468,7 @@
 
   RT.connect();
   api('/api/branding').then(applyBranding).catch(function () {
-    toast('Cannot reach the booking server. Set the API address.', 'error');
-    setTimeout(apiDialog, 400);
+    toast('Cannot reach the booking server. Please try again later.', 'error');
   }).then(function () { setTimeout(hideSplash, 700); }, function () { setTimeout(hideSplash, 700); });
   setTimeout(hideSplash, 6000);
 
