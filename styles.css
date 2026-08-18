@@ -61,9 +61,14 @@
   --speed: 160ms;
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
   --header-h: 66px;
+
+  /* Dynamic white-label watermark (set from Superadmin branding). */
+  --brand-watermark-opacity: 0.075;
 }
 
+
 [data-theme="dark"] {
+  --brand-watermark-opacity: 0.105;
   --brand-background: #131816;
   --surface: #1b221f;
   --surface-2: #202825;
@@ -101,45 +106,35 @@ body {
   background: var(--brand-background);
   -webkit-font-smoothing: antialiased;
   overflow-x: hidden;
-  position: relative;
-  isolation: isolate;
 }
 
-/* ---------- Brand watermark ---------------------------------------
-   Uses the existing AZUL COURTSIDE brand asset as a very subtle,
-   fixed watermark across the complete client/admin UI. The layer is
-   non-interactive and intentionally sits above page surfaces so the
-   branding remains visible even inside cards, panels and sections.
--------------------------------------------------------------------- */
-body::before {
-  content: "";
+/* ------------------------------------------------------------------
+   Dynamic branding watermark
+   The image source is supplied at runtime by Superadmin branding.
+   It is intentionally fixed, oversized, faint, non-interactive, and
+   sits behind the actual UI so it reads like a subtle watermark.
+   ------------------------------------------------------------------ */
+#brand-watermark {
   position: fixed;
-  inset: 0;
-  z-index: 9998;
+  z-index: 0;
+  left: 50%;
+  top: 56%;
+  width: min(780px, 68vw);
+  height: min(780px, 68vw);
+  transform: translate(-50%, -50%);
+  object-fit: contain;
+  object-position: center;
+  opacity: 0;
+  filter: grayscale(100%);
   pointer-events: none;
-  background-image: url("branding/app_logo-1786955097906-db986592811d.svg");
-  background-repeat: no-repeat;
-  background-position: center center;
-  background-size: min(430px, 58vw);
-  opacity: 0.035;
-  filter: grayscale(1) contrast(0.9);
-  mix-blend-mode: multiply;
+  user-select: none;
+  -webkit-user-drag: none;
+  transition: opacity 220ms var(--ease);
 }
-
-[data-theme="dark"] body::before {
-  opacity: 0.055;
-  mix-blend-mode: screen;
-}
-
-@media (max-width: 700px) {
-  body::before {
-    background-size: min(300px, 68vw);
-    opacity: 0.03;
-  }
-
-  [data-theme="dark"] body::before {
-    opacity: 0.045;
-  }
+#brand-watermark.is-visible { opacity: var(--brand-watermark-opacity); }
+.auth-wrap, #view-app, .admin-shell { position: relative; z-index: 1; }
+@media (max-width: 900px) {
+  #brand-watermark { width: min(620px, 82vw); height: min(620px, 82vw); top: 54%; }
 }
 img { max-width: 100%; display: block; }
 button, input, select, textarea { font: inherit; color: inherit; }
