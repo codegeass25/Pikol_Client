@@ -12,7 +12,6 @@
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-<div id="brand-watermark" aria-hidden="true"></div>
 
 <!-- ========================= BOOT SPLASH ========================= -->
 <div id="boot-splash" class="boot-splash" role="status" aria-live="polite">
@@ -566,19 +565,6 @@
     var contact = [b.address, b.contact_number, b.contact_email].filter(Boolean).join(' \u00b7 ');
     $('#hero-contact').textContent = contact;
     var fc = $('#facility-contact'); if (fc) fc.textContent = contact;
-
-    /* Use the Superadmin's current main branding logo as the global watermark. */
-    var wm = $('#brand-watermark');
-    var wmUrl = b.logo_url || b.app_logo_url || b.boot_logo_url || '';
-    if (wm) {
-      if (wmUrl) {
-        wm.src = assetUrl(wmUrl);
-        wm.classList.add('is-visible');
-      } else {
-        wm.removeAttribute('src');
-        wm.classList.remove('is-visible');
-      }
-    }
   }
 
   function hideSplash() {
@@ -1146,6 +1132,33 @@
     });
   }
 
+
+  function startPayMongoWallet(info, method, returnUrl, customer) {
+    var publicKey = String(info.public_key || '').trim();
+    if (!publicKey) return Promise.reject(new Error('PayMongo public key is not configured.'));
+    var headers = { 'Content-Type': 'application/json', 'Authorization': 'Basic ' + btoa(publicKey + ':') };
+    var billing = {};
+    if (customer && customer.name) billing.name = customer.name;
+    if (customer && customer.email) billing.email = customer.email;
+    return fetch('https://api.paymongo.com/v1/payment_methods', {
+      method:'POST', headers:headers,
+      body:JSON.stringify({ data:{ attributes:Object.assign({type:method}, Object.keys(billing).length ? {billing:billing} : {}) } })
+    }).then(function(r){ return r.json().catch(function(){return {};}).then(function(d){ if(!r.ok) throw new Error((d.errors&&d.errors[0]&&d.errors[0].detail)||'PayMongo could not create the payment method.'); return d; }); })
+      .then(function(pm){
+        var pmId=pm&&pm.data&&pm.data.id; if(!pmId) throw new Error('PayMongo did not return a payment method ID.');
+        return fetch('https://api.paymongo.com/v1/payment_intents/'+encodeURIComponent(info.payment_intent_id)+'/attach',{
+          method:'POST',headers:headers,body:JSON.stringify({data:{attributes:{payment_method:pmId,client_key:info.client_key,return_url:returnUrl}}})
+        });
+      }).then(function(r){ return r.json().catch(function(){return {};}).then(function(d){ if(!r.ok) throw new Error((d.errors&&d.errors[0]&&d.errors[0].detail)||'PayMongo could not attach the payment method.'); return d; }); })
+      .then(function(d){
+        var a=d&&d.data&&d.data.attributes?d.data.attributes:{};
+        if(a.next_action&&a.next_action.redirect&&a.next_action.redirect.url){ window.location.href=a.next_action.redirect.url; return d; }
+        if(a.status==='succeeded'||a.status==='processing'){ window.location.href=returnUrl; return d; }
+        var er=a.last_payment_error&&(a.last_payment_error.detail||a.last_payment_error.message);
+        throw new Error(er||('PayMongo payment is currently '+(a.status||'unavailable')+'.'));
+      });
+  }
+
   function paymentDialog(bookingId) {
     var b = myBookings.filter(function (x) { return x.id === Number(bookingId); })[0];
     if (!b) return;
@@ -1181,7 +1194,7 @@
           '<input class="input" id="pm-ref" maxlength="64" readonly tabindex="-1" placeholder="Upload your receipt and we will read this for you" />' +
           '<span class="ocr-status" id="pm-ocr-status">Upload your receipt to detect the reference number.</span></div>' +
           '</div>' +
-          '<div id="pm-online" class="card hidden" style="margin:0"><strong>ONLINE PAYMENT</strong><div class="s muted mt-2">Pay securely through PayMongo Hosted Checkout. Payment is automatically verified by the backend after PayMongo confirms it.</div></div>' +
+          '<div id="pm-online" class="card hidden" style="margin:0"><strong>AUTOMATIC PAYMONGO</strong><div class="field mt-2"><label class="label" for="pm-wallet">Payment method</label><select class="select" id="pm-wallet"><option value="gcash">GCash</option><option value="paymaya">Maya / PayMaya</option><option value="grab_pay">GrabPay</option><option value="shopeepay">ShopeePay</option><option value="card">Card (Hosted Checkout)</option></select></div><div class="s muted mt-2">GCash / Maya / GrabPay / ShopeePay use PayMongo Payment Intent redirect. Card uses PayMongo Hosted Checkout.</div></div>' +
           '<div class="field"><label class="label" for="pm-amount">Amount to pay</label>' +
           '<input class="input" id="pm-amount" type="number" step="0.01" min="0" value="' + fee.toFixed(2) + '" readonly tabindex="-1" />' +
           '<span class="field-hint">Set by the facility. The server always uses this amount.</span></div>',
@@ -1191,11 +1204,13 @@
           var method = $('#pm-method', h).value;
           if (!method) return Promise.reject(new Error('Select a payment method.'));
           if (method === 'paymongo') {
-            return api('/api/paymongo/checkout', { method: 'POST', body: { transaction_type: 'booking', source_id: b.id } })
-              .then(function (r) {
-                if (!r.checkout_url) throw new Error('PayMongo did not return a checkout URL.');
-                window.location.href = r.checkout_url;
-              });
+            var wallet = $('#pm-wallet', h).value;
+            if (wallet === 'card') {
+              return api('/api/paymongo/checkout', { method: 'POST', body: { transaction_type: 'booking', source_id: b.id } })
+                .then(function (r) { if (!r.checkout_url) throw new Error('PayMongo did not return a hosted checkout URL.'); window.location.href = r.checkout_url; });
+            }
+            return api('/api/paymongo/intent', { method: 'POST', body: { transaction_type:'booking', source_id:b.id, payment_method:wallet, return_url:window.location.href.split('?')[0] } })
+              .then(function(info){ return startPayMongoWallet(info, wallet, info.return_url, {name:USER && USER.full_name, email:USER && USER.email}); });
           }
           if (OCR.busy) return Promise.reject(new Error('Still reading your receipt. Please wait a moment.'));
           if (!OCR.token || !OCR.canSubmit) {
@@ -1620,6 +1635,7 @@
               (x.available ? '' : ' (unavailable)') + '</option>';
           }).join('') + '</select></div>' +
           '<div id="pf-details"></div>' +
+          '<div id="pf-online" class="card hidden" style="margin:0"><strong>AUTOMATIC PAYMONGO</strong><div class="field mt-2"><label class="label" for="pf-wallet">Payment method</label><select class="input" id="pf-wallet"><option value="gcash">GCash</option><option value="paymaya">Maya / PayMaya</option><option value="grab_pay">GrabPay</option><option value="shopeepay">ShopeePay</option><option value="card">Card (Hosted Checkout)</option></select></div><p class="s muted">E-wallets use the PayMongo Payment Intent redirect flow; card uses Hosted Checkout.</p></div>' +
           '<div id="pf-manual" class="stack" style="gap:12px">' +
           '<div class="field"><label class="label" for="pf-file">Payment receipt (JPG, PNG or WEBP, max 5MB)</label>' +
           '<input class="input" id="pf-file" type="file" accept="image/png,image/jpeg,image/webp" /></div>' +
@@ -1632,11 +1648,11 @@
         onConfirm: function (host) {
           var method = $('#pf-method', host).value;
           if (method === 'paymongo') {
-            return api('/api/paymongo/checkout', { method: 'POST', body: { transaction_type: opts.eventType, source_id: opts.registrationId } })
-              .then(function (r) {
-                if (!r.checkout_url) throw new Error('PayMongo did not return a checkout URL.');
-                window.location.href = r.checkout_url;
-              });
+            var wallet = $('#pf-wallet', host).value;
+            if (wallet === 'card') {
+              return api('/api/paymongo/checkout', { method:'POST', body:{ transaction_type:opts.eventType, source_id:opts.registrationId } }).then(function(r){ if(!r.checkout_url) throw new Error('PayMongo did not return a hosted checkout URL.'); window.location.href=r.checkout_url; });
+            }
+            return api('/api/paymongo/intent',{method:'POST',body:{transaction_type:opts.eventType,source_id:opts.registrationId,payment_method:wallet,return_url:window.location.href.split('?')[0]}}).then(function(info){ return startPayMongoWallet(info,wallet,info.return_url,{name:USER&&USER.full_name,email:USER&&USER.email}); });
           }
           if (method === 'card') {
             toast('The legacy card option is no longer used. Select Pay securely online with PayMongo.', 'error');
@@ -1669,7 +1685,9 @@
         var key = $('#pf-method', host).value;
         var info = methods.filter(function (x) { return x.key === key; })[0] || {};
         var manual = key !== 'card' && key !== 'paymongo';
+        var online = key === 'paymongo';
         $('#pf-manual', host).classList.toggle('hidden', !manual);
+        $('#pf-online', host).classList.toggle('hidden', !online);
         $('#pf-details', host).innerHTML = manual
           ? '<div class="card stack" style="gap:8px;margin:0">' +
             (info.account_name ? '<div class="s"><strong>Account name:</strong> ' + esc(info.account_name) + '</div>' : '') +
